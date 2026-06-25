@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Earn — CoinEarn</title>
+<link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+<nav class="nav">
+  <a href="index.html" class="nav-logo">
+    <div class="logo-icon">C</div>
+    <span class="nav-brand">CoinEarn</span>
+  </a>
+  <div class="nav-links">
+    <a href="dashboard.html" class="btn btn-ghost btn-sm">Overview</a>
+    <a href="offerwalls.html" class="btn btn-ghost btn-sm" style="color:var(--primary)">Earn</a>
+    <a href="withdraw.html" class="btn btn-ghost btn-sm">Withdraw</a>
+    <a href="transactions.html" class="btn btn-ghost btn-sm">Transactions</a>
+  </div>
+  <div class="nav-user">
+    <div style="text-align:right">
+      <div class="nav-email" id="navEmail"></div>
+      <div class="nav-balance" id="navBalance"></div>
+    </div>
+    <button class="btn btn-outline btn-sm" onclick="doLogout()">Sign out</button>
+  </div>
+</nav>
+
+<div class="container page">
+  <div class="section">
+    <h1 style="font-size:26px;font-weight:800;margin-bottom:6px">Earn Rewards</h1>
+    <p class="text-muted text-sm">Complete tasks from our partner networks to earn coins</p>
+  </div>
+
+  <!-- Filter pills -->
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px" id="filters">
+    <button class="btn btn-primary btn-sm" data-cat="ALL" onclick="filterCat(this,'ALL')">ALL</button>
+    <button class="btn btn-outline btn-sm" data-cat="SURVEYS" onclick="filterCat(this,'SURVEYS')">SURVEYS</button>
+    <button class="btn btn-outline btn-sm" data-cat="VIDEOS" onclick="filterCat(this,'VIDEOS')">VIDEOS</button>
+    <button class="btn btn-outline btn-sm" data-cat="GAMES" onclick="filterCat(this,'GAMES')">GAMES</button>
+    <button class="btn btn-outline btn-sm" data-cat="OFFERS" onclick="filterCat(this,'OFFERS')">OFFERS</button>
+  </div>
+
+  <div class="grid-3" id="owGrid"></div>
+
+  <div class="card" style="margin-top:28px">
+    <div style="font-weight:700;margin-bottom:8px">💡 How payouts work</div>
+    <div class="text-sm text-muted" style="line-height:1.7">
+      When you complete a task our partner networks send a secure callback to our servers.
+      Your balance is updated automatically — usually within minutes. Minimum withdrawal is
+      <strong style="color:var(--text)">1,000 Coins ($1.00 USD)</strong>.
+    </div>
+  </div>
+</div>
+
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script>
+  const user = requireAuth();
+  let current = 'ALL';
+
+  function renderGrid(cat) {
+    const grid = document.getElementById('owGrid');
+    const list = cat === 'ALL' ? OFFERWALLS : OFFERWALLS.filter(o => o.category === cat);
+    grid.innerHTML = list.map(ow => `
+    <div class="ow-card">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span class="badge ${CATEGORY_BADGE[ow.category]}">${ow.category}</span>
+        <div style="text-align:right">
+          <div class="ow-reward">+${fmt(ow.coins)}</div>
+          <div style="font-size:11px;color:var(--muted)">coins</div>
+        </div>
+      </div>
+      <div>
+        <div class="ow-name">${ow.name}</div>
+        <div class="ow-desc" style="margin-top:6px">${ow.desc}</div>
+      </div>
+      <div style="border-top:1px solid var(--border);padding-top:14px">
+        <div class="text-xs text-muted" style="margin-bottom:10px">≈ ${fmtUsd(ow.coins)} USD</div>
+        <button class="btn btn-primary btn-full btn-sm" onclick="startOffer(${ow.id})">Start Earning</button>
+      </div>
+    </div>`).join('');
+  }
+
+  function filterCat(el, cat) {
+    document.querySelectorAll('#filters button').forEach(b => {
+      b.className = 'btn btn-outline btn-sm';
+    });
+    el.className = 'btn btn-primary btn-sm';
+    current = cat;
+    renderGrid(cat);
+  }
+
+  function startOffer(id) {
+    const ow = OFFERWALLS.find(o => o.id === id);
+    if (!ow || !user) return;
+    if (confirm(`Start "${ow.name}"?\n\nThis will open the partner offer in a new tab. Complete it fully to earn ${fmt(ow.coins)} Coins.`)) {
+      // Simulate earning (demo)
+      const users = getUsers();
+      const u = users.find(x => x.id === user.id);
+      if (u) {
+        u.balance += ow.coins;
+        u.totalEarned += ow.coins;
+        saveUsers(users);
+        setSession(u);
+        const txs = getTxs(user.id);
+        txs.unshift({ id: Date.now(), type: 'CREDIT_OFFERWALL', amount: ow.coins, status: 'COMPLETED', note: ow.name, date: new Date().toISOString().slice(0,10) });
+        saveTxs(user.id, txs);
+      }
+      showToast('Coins earned! 🎉', `+${fmt(ow.coins)} Coins added to your balance.`, 'success');
+      setTimeout(updateNavBalance, 100);
+    }
+  }
+
+  if (user) { updateNavBalance(); renderGrid('ALL'); }
+</script>
+</body>
+</html>

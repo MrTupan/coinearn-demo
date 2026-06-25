@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Create Account — CoinEarn</title>
+<link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+<div class="auth-page">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <div class="auth-logo-icon" onclick="location.href='index.html'">C</div>
+      <div class="auth-title">Create your account</div>
+      <div class="auth-sub">Start earning crypto rewards today</div>
+    </div>
+
+    <div id="errorBox" class="alert alert-danger" style="display:none;margin-bottom:16px"></div>
+
+    <div class="form-card">
+      <form id="regForm" style="display:flex;flex-direction:column;gap:16px">
+        <div class="field">
+          <label class="label">Email address</label>
+          <input class="input" type="email" id="email" placeholder="you@gmail.com" required>
+          <div class="input-hint">Gmail, Yahoo, or Outlook only</div>
+        </div>
+        <div class="field">
+          <label class="label">Phone number</label>
+          <input class="input" type="tel" id="phone" placeholder="+1 555 000 0000" required>
+        </div>
+        <div class="field">
+          <label class="label">Password</label>
+          <input class="input" type="password" id="password" placeholder="Min. 8 characters" minlength="8" required>
+        </div>
+        <div class="field">
+          <label class="label">Confirm password</label>
+          <input class="input" type="password" id="confirm" placeholder="Repeat password" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full" id="submitBtn">Create Account</button>
+      </form>
+    </div>
+
+    <p class="text-center text-sm text-muted" style="margin-top:20px">
+      Already have an account? <a href="login.html">Sign in</a>
+    </p>
+  </div>
+</div>
+
+<!-- OTP Modal -->
+<div class="modal-overlay" id="otpModal">
+  <div class="modal">
+    <div class="modal-title">📧 Verify your email</div>
+    <div class="modal-desc" id="otpDesc">We sent a 6-digit code to your email. Enter it below to complete registration.</div>
+    <div id="otpError" class="alert alert-danger" style="display:none;margin-bottom:14px"></div>
+    <div class="field" style="margin-bottom:16px">
+      <label class="label">Verification code</label>
+      <input class="input" type="text" id="otpInput" maxlength="6" placeholder="000000"
+        style="text-align:center;font-size:26px;letter-spacing:10px;font-weight:900;font-family:monospace">
+    </div>
+    <button class="btn btn-primary btn-full" id="otpBtn" onclick="verifyOtp()">Verify &amp; Create Account</button>
+    <p class="text-center text-sm text-muted" style="margin-top:12px">Code expires in 5 minutes</p>
+  </div>
+</div>
+
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script>
+  requireGuest();
+
+  let _otp = '';
+  let _pendingUser = {};
+  const ALLOWED = ['gmail.com','yahoo.com','outlook.com','hotmail.com'];
+
+  document.getElementById('regForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const email   = document.getElementById('email').value.trim().toLowerCase();
+    const phone   = document.getElementById('phone').value.trim();
+    const pass    = document.getElementById('password').value;
+    const confirm = document.getElementById('confirm').value;
+    const errBox  = document.getElementById('errorBox');
+    const btn     = document.getElementById('submitBtn');
+
+    errBox.style.display = 'none';
+
+    const domain = email.split('@')[1];
+    if (!ALLOWED.includes(domain)) {
+      errBox.textContent = 'Only Gmail, Yahoo, or Outlook email addresses are allowed.';
+      errBox.style.display = 'block'; return;
+    }
+    if (pass !== confirm) {
+      errBox.textContent = 'Passwords do not match.';
+      errBox.style.display = 'block'; return;
+    }
+    if (pass.length < 8) {
+      errBox.textContent = 'Password must be at least 8 characters.';
+      errBox.style.display = 'block'; return;
+    }
+
+    const users = getUsers();
+    if (users.find(u => u.email === email)) {
+      errBox.textContent = 'An account with this email already exists.';
+      errBox.style.display = 'block'; return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span>🔒 Verifying security...</span>';
+
+    setTimeout(() => {
+      // Generate OTP
+      _otp = Math.floor(100000 + Math.random() * 900000).toString();
+      _pendingUser = { email, phone, password: pass };
+
+      document.getElementById('otpDesc').innerHTML =
+        `We sent a 6-digit code to <strong>${email}</strong>.<br>
+        <span style="color:var(--warn);font-size:13px">🔑 Demo code: <strong style="font-family:monospace;letter-spacing:4px">${_otp}</strong></span>`;
+
+      document.getElementById('otpModal').classList.add('open');
+      btn.disabled = false; btn.textContent = 'Create Account';
+    }, 900);
+  });
+
+  function verifyOtp() {
+    const input = document.getElementById('otpInput').value.trim();
+    const errEl = document.getElementById('otpError');
+    const btn   = document.getElementById('otpBtn');
+
+    errEl.style.display = 'none';
+    if (input !== _otp) {
+      errEl.textContent = 'Invalid code. Try again.';
+      errEl.style.display = 'block'; return;
+    }
+
+    btn.disabled = true; btn.textContent = 'Creating account...';
+
+    setTimeout(() => {
+      const users = getUsers();
+      const newUser = {
+        id: Date.now(),
+        email: _pendingUser.email,
+        password: _pendingUser.password,
+        phone: _pendingUser.phone,
+        name: _pendingUser.email.split('@')[0],
+        balance: 0,
+        totalEarned: 0,
+        totalWithdrawn: 0,
+        referralCode: 'CE' + Math.random().toString(36).substring(2,6).toUpperCase(),
+        joined: new Date().toISOString().slice(0,10),
+        status: 'Active',
+        isAdmin: false,
+      };
+      users.push(newUser);
+      saveUsers(users);
+      setSession(newUser);
+      window.location.href = 'dashboard.html';
+    }, 700);
+  }
+</script>
+</body>
+</html>

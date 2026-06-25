@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Withdraw — CoinEarn</title>
+<link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+<nav class="nav">
+  <a href="index.html" class="nav-logo">
+    <div class="logo-icon">C</div>
+    <span class="nav-brand">CoinEarn</span>
+  </a>
+  <div class="nav-links">
+    <a href="dashboard.html" class="btn btn-ghost btn-sm">Overview</a>
+    <a href="offerwalls.html" class="btn btn-ghost btn-sm">Earn</a>
+    <a href="withdraw.html" class="btn btn-ghost btn-sm" style="color:var(--primary)">Withdraw</a>
+    <a href="transactions.html" class="btn btn-ghost btn-sm">Transactions</a>
+  </div>
+  <div class="nav-user">
+    <div style="text-align:right">
+      <div class="nav-email" id="navEmail"></div>
+      <div class="nav-balance" id="navBalance"></div>
+    </div>
+    <button class="btn btn-outline btn-sm" onclick="doLogout()">Sign out</button>
+  </div>
+</nav>
+
+<div class="container page" style="max-width:720px">
+  <div class="section">
+    <h1 style="font-size:26px;font-weight:800;margin-bottom:6px">Withdraw</h1>
+    <p class="text-muted text-sm">Redeem your coins for crypto. Minimum: 1,000 Coins ($1.00 USD).</p>
+  </div>
+
+  <!-- Balance card -->
+  <div class="balance-hero" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:24px">
+    <div>
+      <div style="font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Available to withdraw</div>
+      <div class="balance-coins" id="balCoins" style="font-size:36px">0 Coins</div>
+      <div class="balance-usd" id="balUsd">$0.00 USD</div>
+    </div>
+    <div id="needMore" style="display:none;text-align:right">
+      <div class="text-xs text-muted">Still need</div>
+      <div id="needAmt" style="font-size:18px;font-weight:800;color:var(--warn)">0 Coins</div>
+    </div>
+  </div>
+
+  <!-- Form -->
+  <div class="form-card section">
+    <div style="font-size:16px;font-weight:700;margin-bottom:18px">New Withdrawal</div>
+    <div id="warnBox" class="alert alert-warn" style="display:none;margin-bottom:16px">
+      You need at least 1,000 Coins to withdraw. Keep earning!
+    </div>
+    <div id="errBox" class="alert alert-danger" style="display:none;margin-bottom:16px"></div>
+    <form id="wdForm" style="display:flex;flex-direction:column;gap:16px">
+      <div class="field">
+        <label class="label">Amount (Coins)</label>
+        <input class="input" type="number" id="amount" min="1000" placeholder="1000" required>
+        <div class="input-hint" id="amountHint">≈ $0.00 USD</div>
+      </div>
+      <div class="field">
+        <label class="label">Wallet type</label>
+        <select class="input" id="walletType">
+          <option value="USDT_TRC20">USDT TRC-20</option>
+          <option value="TON">TON Wallet</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="label">Wallet address</label>
+        <input class="input" type="text" id="walletAddr" placeholder="Paste your wallet address" required>
+      </div>
+      <button type="submit" class="btn btn-primary btn-full" id="submitBtn">Request Withdrawal</button>
+    </form>
+  </div>
+
+  <!-- History -->
+  <div class="section">
+    <div class="section-title" style="margin-bottom:14px">Withdrawal History</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Date</th>
+          <th class="hide-sm">Wallet</th>
+          <th class="right">Amount</th>
+          <th class="right">Status</th>
+        </tr></thead>
+        <tbody id="wdHistory"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script>
+  const user = requireAuth();
+  const MIN = 1000;
+
+  function refresh() {
+    const s = getSession();
+    if (!s) return;
+    document.getElementById('balCoins').textContent = fmt(s.balance) + ' Coins';
+    document.getElementById('balUsd').textContent = fmtUsd(s.balance) + ' USD';
+    document.getElementById('navBalance').textContent = fmt(s.balance) + ' Coins';
+    if (s.balance < MIN) {
+      document.getElementById('warnBox').style.display = 'block';
+      document.getElementById('needMore').style.display = 'block';
+      document.getElementById('needAmt').textContent = fmt(MIN - s.balance) + ' more';
+      document.getElementById('submitBtn').disabled = true;
+    }
+
+    const wds = getWithdrawals(s.id);
+    const tbody = document.getElementById('wdHistory');
+    if (!wds.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="empty">No withdrawals yet.</td></tr>';
+    } else {
+      tbody.innerHTML = wds.map(w => `
+      <tr>
+        <td style="color:var(--muted)">${w.date}</td>
+        <td class="hide-sm" style="font-family:monospace;font-size:12px">${w.wallet} <span style="color:var(--muted);font-size:11px">${w.walletType}</span></td>
+        <td class="right" style="font-weight:700">${fmt(w.amount)} C</td>
+        <td class="right"><span class="badge ${STATUS_BADGE[w.status]}">${w.status}</span></td>
+      </tr>`).join('');
+    }
+  }
+
+  document.getElementById('amount').addEventListener('input', function() {
+    document.getElementById('amountHint').textContent = '≈ ' + fmtUsd(+this.value || 0) + ' USD';
+  });
+
+  document.getElementById('wdForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const s = getSession();
+    const amount = parseInt(document.getElementById('amount').value);
+    const walletType = document.getElementById('walletType').value;
+    const walletAddr = document.getElementById('walletAddr').value.trim();
+    const errBox = document.getElementById('errBox');
+    const btn = document.getElementById('submitBtn');
+
+    errBox.style.display = 'none';
+    if (amount < MIN) { errBox.textContent = `Minimum withdrawal is ${fmt(MIN)} Coins.`; errBox.style.display='block'; return; }
+    if (amount > s.balance) { errBox.textContent = 'Insufficient balance.'; errBox.style.display='block'; return; }
+    if (walletAddr.length < 10) { errBox.textContent = 'Enter a valid wallet address.'; errBox.style.display='block'; return; }
+
+    btn.disabled = true; btn.textContent = 'Processing...';
+
+    setTimeout(() => {
+      // Deduct balance
+      const users = getUsers();
+      const u = users.find(x => x.id === s.id);
+      u.balance -= amount;
+      u.totalWithdrawn += amount;
+      saveUsers(users);
+      setSession(u);
+
+      // Save withdrawal
+      const wds = getWithdrawals(s.id);
+      wds.unshift({ id: Date.now(), amount, walletType, wallet: walletAddr.slice(0,6)+'...'+walletAddr.slice(-4), status: 'PENDING', date: new Date().toISOString().slice(0,10) });
+      saveWithdrawals(s.id, wds);
+
+      // Save tx
+      const txs = getTxs(s.id);
+      txs.unshift({ id: Date.now(), type: 'DEBIT_WITHDRAWAL', amount, status: 'PENDING', note: walletType, date: new Date().toISOString().slice(0,10) });
+      saveTxs(s.id, txs);
+
+      showToast('Withdrawal requested', 'Your request is being processed (24–48h).', 'success');
+      document.getElementById('wdForm').reset();
+      document.getElementById('amountHint').textContent = '≈ $0.00 USD';
+      btn.disabled = false; btn.textContent = 'Request Withdrawal';
+      refresh();
+    }, 900);
+  });
+
+  if (user) { updateNavBalance(); refresh(); }
+</script>
+</body>
+</html>

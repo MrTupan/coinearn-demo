@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dashboard — CoinEarn</title>
+<link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+<nav class="nav">
+  <a href="index.html" class="nav-logo">
+    <div class="logo-icon">C</div>
+    <span class="nav-brand">CoinEarn</span>
+  </a>
+  <div class="nav-links">
+    <a href="dashboard.html" class="btn btn-ghost btn-sm dash-tab active" style="border-bottom:none">Overview</a>
+    <a href="offerwalls.html" class="btn btn-ghost btn-sm">Earn</a>
+    <a href="withdraw.html" class="btn btn-ghost btn-sm">Withdraw</a>
+    <a href="transactions.html" class="btn btn-ghost btn-sm">Transactions</a>
+  </div>
+  <div class="nav-user">
+    <div style="text-align:right">
+      <div class="nav-email" id="navEmail"></div>
+      <div class="nav-balance" id="navBalance"></div>
+    </div>
+    <button class="btn btn-outline btn-sm" onclick="doLogout()">Sign out</button>
+  </div>
+</nav>
+
+<div class="container page">
+
+  <!-- Balance hero -->
+  <div class="balance-hero" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:24px">
+    <div>
+      <div style="font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Available Balance</div>
+      <div class="balance-coins" id="balCoins">0</div>
+      <div class="balance-usd" id="balUsd">≈ $0.00 USD · 1,000 Coins = $1.00</div>
+    </div>
+    <a href="withdraw.html" class="btn btn-primary" id="wdBtn">Withdraw Funds</a>
+  </div>
+
+  <!-- Stats -->
+  <div class="grid-3 section">
+    <div class="stat-card">
+      <div class="stat-label">Total Earned</div>
+      <div class="stat-value text-primary" id="statEarned">0</div>
+      <div class="stat-sub" id="statEarnedUsd">$0.00</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Withdrawn</div>
+      <div class="stat-value" id="statWithdrawn">0</div>
+      <div class="stat-sub" id="statWithdrawnUsd">$0.00</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Referral Code</div>
+      <div class="stat-value" id="statRef" style="font-size:20px;font-family:monospace;letter-spacing:3px">—</div>
+      <div class="stat-sub">Share to earn 250 Coins</div>
+    </div>
+  </div>
+
+  <!-- Quick Earn -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">Earn Now</div>
+      <a href="offerwalls.html" class="btn btn-ghost btn-sm">View all →</a>
+    </div>
+    <div class="grid-3" id="quickEarn"></div>
+  </div>
+
+  <!-- Recent activity -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">Recent Activity</div>
+      <a href="transactions.html" class="btn btn-ghost btn-sm">View all →</a>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Type</th><th class="hide-sm">Date</th>
+          <th class="right">Amount</th><th class="right">Status</th>
+        </tr></thead>
+        <tbody id="recentTx"><tr><td colspan="4" class="empty">No activity yet.</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script>
+  const user = requireAuth();
+  if (user) {
+    updateNavBalance();
+    document.getElementById('balCoins').textContent = fmt(user.balance) + ' Coins';
+    document.getElementById('balUsd').textContent = `≈ ${fmtUsd(user.balance)} USD · 1,000 Coins = $1.00`;
+    document.getElementById('statEarned').textContent = fmt(user.totalEarned) + ' C';
+    document.getElementById('statEarnedUsd').textContent = fmtUsd(user.totalEarned);
+    document.getElementById('statWithdrawn').textContent = fmt(user.totalWithdrawn) + ' C';
+    document.getElementById('statWithdrawnUsd').textContent = fmtUsd(user.totalWithdrawn);
+    document.getElementById('statRef').textContent = user.referralCode || '—';
+    if (user.balance < 1000) document.getElementById('wdBtn').classList.add('btn-outline');
+
+    // Quick earn cards
+    const qe = document.getElementById('quickEarn');
+    OFFERWALLS.slice(0,3).forEach(ow => {
+      qe.innerHTML += `
+      <div class="ow-card">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span class="badge ${CATEGORY_BADGE[ow.category]}">${ow.category}</span>
+          <span class="ow-reward">+${fmt(ow.coins)} C</span>
+        </div>
+        <div><div class="ow-name">${ow.name}</div><div class="ow-desc" style="margin-top:6px">${ow.desc}</div></div>
+        <a href="offerwalls.html" class="btn btn-outline btn-sm btn-full">Start Earning</a>
+      </div>`;
+    });
+
+    // Recent txs
+    const txs = getTxs(user.id).slice(0,5);
+    const tbody = document.getElementById('recentTx');
+    if (txs.length) {
+      tbody.innerHTML = txs.map(tx => `
+      <tr>
+        <td>${TX_LABELS[tx.type] || tx.type}</td>
+        <td class="hide-sm" style="color:var(--muted)">${tx.date}</td>
+        <td class="right" style="font-weight:700;color:${tx.type.startsWith('CREDIT') ? 'var(--primary)' : 'var(--text)'}">
+          ${tx.type.startsWith('CREDIT') ? '+' : '-'}${fmt(tx.amount)} C
+        </td>
+        <td class="right"><span class="badge ${STATUS_BADGE[tx.status]}">${tx.status}</span></td>
+      </tr>`).join('');
+    }
+  }
+</script>
+</body>
+</html>

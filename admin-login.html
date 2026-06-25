@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin Login — CoinEarn</title>
+<link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+<div class="auth-page">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <div class="auth-logo-icon" style="background:#1a1a1a;border:2px solid var(--border2)" onclick="location.href='index.html'">🛡️</div>
+      <div class="auth-title">Admin Panel</div>
+      <div class="auth-sub">CoinEarn platform administration</div>
+    </div>
+
+    <div id="errorBox" class="alert alert-danger" style="display:none;margin-bottom:16px"></div>
+
+    <div class="form-card">
+      <form id="loginForm" style="display:flex;flex-direction:column;gap:16px">
+        <div class="field">
+          <label class="label">Admin email</label>
+          <input class="input" type="email" id="email" placeholder="admin@coinearn.app" required
+            value="jamalarmani710@gmail.com">
+        </div>
+        <div class="field">
+          <label class="label">Password</label>
+          <input class="input" type="password" id="password" placeholder="••••••••" required
+            value="jamal@123">
+        </div>
+        <button type="submit" class="btn btn-primary btn-full" id="submitBtn">Sign in to Admin Panel</button>
+      </form>
+    </div>
+
+    <p class="text-center text-sm text-muted" style="margin-top:20px">
+      <a href="login.html" style="color:var(--muted2)">← Back to platform login</a>
+    </p>
+  </div>
+</div>
+
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script>
+  // If already admin session, redirect
+  const s = getSession();
+  if (s && s.isAdmin) window.location.href = 'admin.html';
+
+  document.getElementById('loginForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const email = document.getElementById('email').value.trim();
+    const pass  = document.getElementById('password').value;
+    const btn   = document.getElementById('submitBtn');
+    const errBox = document.getElementById('errorBox');
+
+    btn.disabled = true; btn.textContent = 'Authenticating...';
+    errBox.style.display = 'none';
+
+    setTimeout(() => {
+      if (email === ADMIN_EMAIL && pass === ADMIN_PASS) {
+        // Create admin session
+        const users = getUsers();
+        const adminUser = users.find(u => u.email === ADMIN_EMAIL) || {
+          id: 0, email: ADMIN_EMAIL, name: 'Admin', balance: 0,
+          totalEarned: 0, totalWithdrawn: 0, referralCode: 'ADMIN',
+          joined: '2026-01-01', status: 'Active', isAdmin: true,
+        };
+        setSession(adminUser);
+        window.location.href = 'admin.html';
+      } else {
+        errBox.textContent = 'Invalid admin credentials.';
+        errBox.style.display = 'block';
+        btn.disabled = false; btn.textContent = 'Sign in to Admin Panel';
+      }
+    }, 700);
+  });
+</script>
+</body>
+</html>
